@@ -2151,13 +2151,13 @@ static ssize_t virtual_syn_keys_show(struct kobject *kobj,
 		"\n");
 }
 
-static ssize_t virtual_syn_three_keys_show(struct kobject *kobj,
+static ssize_t virtual_syn_3_keys_show(struct kobject *kobj,
 			struct kobj_attribute *attr, char *buf)
 {
 	return sprintf(buf,
-		__stringify(EV_KEY) ":" __stringify(KEY_BACK)       ":112:1345:120:100"
-		":" __stringify(EV_KEY) ":" __stringify(KEY_HOME)   ":360:1345:120:100"
-		":" __stringify(EV_KEY) ":" __stringify(KEY_APP_SWITCH)   ":595:1345:120:100"
+		__stringify(EV_KEY) ":" __stringify(KEY_BACK)   ":121:1340:110:100"
+		":" __stringify(EV_KEY) ":" __stringify(KEY_HOME)       ":359:1340:112:100"
+		":" __stringify(EV_KEY) ":" __stringify(KEY_APP_SWITCH) ":605:1340:118:100"
 		"\n");
 }
 
@@ -2169,12 +2169,12 @@ static struct kobj_attribute syn_virtual_keys_attr = {
 	.show = &virtual_syn_keys_show,
 };
 
-static struct kobj_attribute syn_three_virtual_keys_attr = {
+static struct kobj_attribute syn_virtual_3_keys_attr = {
 	.attr = {
 		.name = "virtualkeys.synaptics-rmi-touchscreen",
 		.mode = S_IRUGO,
 	},
-	.show = &virtual_syn_three_keys_show,
+	.show = &virtual_syn_3_keys_show,
 };
 
 static struct attribute *properties_attrs[] = {
@@ -2182,8 +2182,8 @@ static struct attribute *properties_attrs[] = {
 	NULL
 };
 
-static struct attribute *three_virtual_key_properties_attrs[] = {
-	&syn_three_virtual_keys_attr.attr,
+static struct attribute *properties_3_key_attrs[] = {
+	&syn_virtual_3_keys_attr.attr,
 	NULL
 };
 
@@ -2191,8 +2191,8 @@ static struct attribute_group properties_attr_group = {
 	.attrs = properties_attrs,
 };
 
-static struct attribute_group three_virtual_key_properties_attr_group = {
-	.attrs = three_virtual_key_properties_attrs,
+static struct attribute_group properties_attr_3_keys_group = {
+	.attrs = properties_3_key_attrs,
 };
 
 static struct bma250_platform_data gsensor_bma250_platform_data = {
@@ -4039,7 +4039,6 @@ static struct spi_board_info rawchip_spi_board_info[] __initdata = {
 static void __init jet_init(void)
 {
 	int rc = 0;
-	u32 hw_ver_id = 0;
 	struct kobject *properties_kobj;
 
 	if (meminfo_init(SYS_MEMORY, SZ_256M) < 0)
@@ -4114,18 +4113,31 @@ static void __init jet_init(void)
 	/*usb driver won't be loaded in MFG 58 station and gift mode*/
 	if (!(board_mfg_mode() == 6 || board_mfg_mode() == 7))
 		jet_add_usb_devices();
-
 	properties_kobj = kobject_create_and_add("board_properties", NULL);
 	if (properties_kobj) {
-		if (system_rev < 1)
-			rc = sysfs_create_group(properties_kobj, &properties_attr_group);
-		else
-			rc = sysfs_create_group(properties_kobj, &three_virtual_key_properties_attr_group);
+		if ((system_rev < 1 && engineerid == 0) ||
+			(system_rev == 1 && engineerid == 1)) {
+			rc = sysfs_create_group(properties_kobj,
+					&properties_attr_group);
+			if (!rc) {
+				for (rc = 0; rc < ARRAY_SIZE(evita_syn_ts_3k_data); rc++) {
+					evita_syn_ts_3k_data[rc].vk_obj = properties_kobj;
+					evita_syn_ts_3k_data[rc].vk2Use = &syn_virtual_keys_attr;
+				}
+			}
+		} else {
+			rc = sysfs_create_group(properties_kobj,
+					&properties_attr_3_keys_group);
+			if (!rc) {
+				for (rc = 0; rc < ARRAY_SIZE(syn_ts_3k_data); rc++) {
+					syn_ts_3k_data[rc].vk_obj = properties_kobj;
+					syn_ts_3k_data[rc].vk2Use = &syn_virtual_3_keys_attr;
+				}
+			}
+		}
 	}
-
 	jet_init_keypad();
-	hw_ver_id = readl(HW_VER_ID_VIRT);
-	printk(KERN_INFO "hw_ver_id = %x\n", hw_ver_id);
+	
 }
 
 #define PHY_BASE_ADDR1  0x80400000
