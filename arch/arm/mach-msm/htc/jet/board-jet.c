@@ -103,6 +103,8 @@
 #include <mach/cpuidle.h>
 #include "rpm_resources.h"
 #include <mach/mpm.h>
+#include "pm.h"
+#include <mach/htc_util.h>
 #include "acpuclock.h"
 #include "rpm_log.h"
 #include "smd_private.h"
@@ -4039,6 +4041,7 @@ static struct spi_board_info rawchip_spi_board_info[] __initdata = {
 static void __init jet_init(void)
 {
 	int rc = 0;
+	u32 hw_ver_id = 0;
 	struct kobject *properties_kobj;
 
 	if (meminfo_init(SYS_MEMORY, SZ_256M) < 0)
@@ -4113,10 +4116,11 @@ static void __init jet_init(void)
 	/*usb driver won't be loaded in MFG 58 station and gift mode*/
 	if (!(board_mfg_mode() == 6 || board_mfg_mode() == 7))
 		jet_add_usb_devices();
+
 	properties_kobj = kobject_create_and_add("board_properties", NULL);
 	if (properties_kobj) {
-		if ((system_rev < 1 && engineerid == 0) ||
-			(system_rev == 1 && engineerid == 1)) {
+		if (system_rev < 1 && engineerid == 0)
+			if (system_rev == 1 && engineerid == 1)
 			rc = sysfs_create_group(properties_kobj,
 					&properties_attr_group);
 			if (!rc) {
@@ -4132,12 +4136,12 @@ static void __init jet_init(void)
 				for (rc = 0; rc < ARRAY_SIZE(syn_ts_3k_data); rc++) {
 					syn_ts_3k_data[rc].vk_obj = properties_kobj;
 					syn_ts_3k_data[rc].vk2Use = &syn_virtual_3_keys_attr;
-				}
-			}
 		}
 	}
+}
 	jet_init_keypad();
-	
+	hw_ver_id = readl(HW_VER_ID_VIRT);
+	printk(KERN_INFO "hw_ver_id = %x\n", hw_ver_id);
 }
 
 #define PHY_BASE_ADDR1  0x80400000
@@ -4166,6 +4170,8 @@ static int __init pm8921_late_init(void)
 }
 
 late_initcall(pm8921_late_init);
+
+
 
 MACHINE_START(JET, "jet")
 	.fixup = jet_fixup,
